@@ -109,6 +109,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
          * @param {*} result
          */
         handleTask(result) {
+            this.count--;
             //是否为第一个任务
             if (this.isFirstTask) {
                 this.isFirstTask = false;
@@ -121,7 +122,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 this.callbacks = {};
             }
             if (this.queue.length) {
-                this.count--;
                 let task = this.queue.shift();
                 isFun(task) && task();
             }

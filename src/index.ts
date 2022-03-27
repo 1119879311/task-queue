@@ -125,6 +125,7 @@ class TaskQueue {
    * @param {*} result
    */
   private handleTask(result: any) {
+    this.count--;
     //是否为第一个任务
     if (this.isFirstTask) {
       this.isFirstTask = false;
@@ -139,7 +140,6 @@ class TaskQueue {
     }
 
     if (this.queue.length) {
-      this.count--;
       let task = this.queue.shift();
       isFun(task) && task();
     }

@@ -1,6 +1,6 @@
 {
-  "name": "task-queue",
-  "version": "1.0.0",
+  "name": "queue-task",
+  "version": "1.1.0",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
@@ -11,7 +11,7 @@
     "queue",
     "node-task",
     "node-queue",
-    "task-queue"
+    "queue-task"
   ],
   "repository": "https://github.com/1119879311/task-queue.git",
   "author": "",
