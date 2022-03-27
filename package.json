@@ -6,7 +6,14 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "task",
+    "queue",
+    "node-task",
+    "node-queue",
+    "task-queue"
+  ],
+  "repository": "https://github.com/1119879311/task-queue.git",
   "author": "",
   "license": "ISC"
 }
