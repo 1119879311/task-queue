@@ -8,7 +8,8 @@ type IhookEMUN =
   | "taskError"
   | "taskSuccess"
   | "firstTaskAfter"
-  | "lastTaskAfter";
+  | "lastTaskAfter"
+  | "taskIntercept";
 
 const isFun = (val: unknown): val is Function => typeof val === "function";
 
@@ -52,6 +53,9 @@ class TaskQueue {
       lastTaskAfter: (cb) => {
         this.callbacks.lastTaskAfter = () => cb;
       },
+      taskIntercept: (cb) => {
+        this.callbacks.taskIntercept = () => cb;
+      },
     };
   }
 
@@ -93,30 +97,41 @@ class TaskQueue {
       this.count++;
       //执行原来的caller
 
-      let resultTaskBefore = await this.handleHooksCallBack(
-        "taskBefore",
-        args,
-        true
-      );
-      if (resultTaskBefore === null) {
-        return reject(null);
+      let resultTaskBefore: any;
+      try {
+        resultTaskBefore = await this.handleHooksCallBack(
+          "taskBefore",
+          args,
+          true
+        );
+        if (resultTaskBefore === null) {
+          this.handleTask(args, true);
+          return reject({ type: "Intercept", data: null, options: args });
+        }
+      } catch (error) {
+        this.handleTask(args, true);
+        return reject({ type: "Intercept", data: null, options: args });
       }
-
       try {
         resultTaskBefore = Array.isArray(resultTaskBefore)
           ? resultTaskBefore
           : [resultTaskBefore];
         let resultTask = await caller(...resultTaskBefore);
+        // 执行后的
         let result = await this.handleHooksCallBack("taskAfter", resultTask);
-
+        // 成功
         this.handleHooksCallBack("taskSuccess", result);
-        resolve(result);
+        //处理任务
         this.handleTask(result);
+        resolve(result);
       } catch (error) {
+        // 执行后的
         let erorRes = await this.handleHooksCallBack("taskAfter", error);
+        // 失败
         this.handleHooksCallBack("taskError", erorRes);
-        reject(erorRes);
+        //处理任务
         this.handleTask(erorRes);
+        reject(erorRes);
       }
     };
   }
@@ -124,20 +139,22 @@ class TaskQueue {
    * 队列任务处理
    * @param {*} result
    */
-  private handleTask(result: any) {
+  private handleTask(result: any, isBlock?: boolean) {
     this.count--;
     //是否为第一个任务
     if (this.isFirstTask) {
       this.isFirstTask = false;
-      this.handleHooksCallBack("firstTaskAfter", result);
+      !isBlock && this.handleHooksCallBack("firstTaskAfter", result);
     }
 
     //判断是否是最后一个任务
     if (this.count === 0 && this.queue.length === 0) {
       this.isFirstTask = true;
-      this.handleHooksCallBack("lastTaskAfter", result);
+      !isBlock && this.handleHooksCallBack("lastTaskAfter", result);
       this.callbacks = {};
     }
+    // 任务被拦截后回调
+    isBlock && this.handleHooksCallBack("taskIntercept", result);
 
     if (this.queue.length) {
       let task = this.queue.shift();

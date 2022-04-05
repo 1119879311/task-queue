@@ -1,7 +1,7 @@
 interface IOption {
     maxTask?: null | number;
 }
-declare type IhookEMUN = "taskBefore" | "taskAfter" | "taskError" | "taskSuccess" | "firstTaskAfter" | "lastTaskAfter";
+declare type IhookEMUN = "taskBefore" | "taskAfter" | "taskError" | "taskSuccess" | "firstTaskAfter" | "lastTaskAfter" | "taskIntercept";
 declare class TaskQueue {
     private config;
     private count;
