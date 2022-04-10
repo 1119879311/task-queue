@@ -1,5 +1,6 @@
 interface IOption {
     maxTask?: null | number;
+    interval?: null | number;
 }
 declare type IhookEMUN = "taskBefore" | "taskAfter" | "taskError" | "taskSuccess" | "firstTaskAfter" | "lastTaskAfter" | "taskIntercept";
 declare class TaskQueue {
@@ -8,6 +9,7 @@ declare class TaskQueue {
     private queue;
     private isFirstTask;
     private callbacks;
+    private isRuning?;
     hooks: Record<IhookEMUN, (cb: Function) => void>;
     constructor(option: IOption);
     /**
@@ -27,6 +29,13 @@ declare class TaskQueue {
      */
     private createTask;
     /**
+     * 处理回调
+     * @param whenTimer 回调时机
+     * @param resulType 回调类型，成功，失败
+     * @param data 数据
+     */
+    private handleTaskCallBack;
+    /**
      * 队列任务处理
      * @param {*} result
      */
@@ -39,5 +48,33 @@ declare class TaskQueue {
      * @returns
      */
     private handleHooksCallBack;
+    /**
+     * 任务队列执行任务
+     */
+    private actionTask;
+    awitTimerRun(timer?: number): Promise<unknown>;
+    /**
+     * 停止执行任务
+     */
+    stopTask(): void;
+    /**
+     * 重新执行任务
+     */
+    runTask(): void;
+    /**
+     * 获取当前正在执行的队列个数
+     * @returns
+     */
+    getRunTaskCount(): number;
+    /**
+     * 获取当前待执行任务队列的总数
+     */
+    getTaskQueueCount(): number;
+    /**
+     *
+     * @param data
+     * @param cb
+     */
+    limit<T>(data: T[], cb: Function): void;
 }
 export default TaskQueue;
