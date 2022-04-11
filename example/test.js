@@ -19,16 +19,16 @@ queueInstance.hooks.taskBefore(function (res) {
         "----------中断的待执行任务重新开始执行",
         queueInstance.getTaskQueueCount()
       );
-      queueInstance.runTask();
+      queueInstance.startTask();
     });
   }
 
-  if (res.a % 3 == 0) {
-    return null;
-  }
-  if (res.a % 4 == 0) {
-    return Promise.reject(null);
-  }
+  // if (res.a % 3 == 0) {
+  //   return null;
+  // }
+  // if (res.a % 4 == 0) {
+  //   return Promise.reject(null);
+  // }
   return res;
 });
 
@@ -88,7 +88,7 @@ function asyncAdd(options) {
       } else {
         reject(options.a + options.b);
       }
-    }, createRond(5000, 2000));
+    }, createRond(7000, 5000));
   });
 }
 
@@ -107,13 +107,13 @@ for (let index = 0; index < 8; index++) {
   //     console.log("err", err);
   //   });
   // 使用队列，控制并发执行个数
-  queueAsyncAdd({ a: index, b: 10 })
-    .then((res) => {
-      console.log("执行 完第" + index + "个任务:", "成功结果为：", res);
-    })
-    .catch((err) => {
-      console.log("执行 完第" + index + "个任务:", "失败结果为：", err);
-    });
+  // queueAsyncAdd({ a: index, b: 10 })
+  //   .then((res) => {
+  //     console.log("执行 完第" + index + "个任务:", "成功结果为：", res);
+  //   })
+  //   .catch((err) => {
+  //     console.log("执行 完第" + index + "个任务:", "失败结果为：", err);
+  //   });
 }
 
 let arr = Array.from(new Array(8), (_, v) => v + 1);

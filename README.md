@@ -1,6 +1,10 @@
+# task-queue 是一个可以控制任务(函数)队列并发的库，支持一个并发队列的等待间隔时间
+
 ```javascript
+
+//示例：
 const TaskQueue = require("task-queue").default;
-let queueInstance = new TaskQueue({ maxTask: 5 });
+let queueInstance = new TaskQueue({ maxTask: 5 ,interval:2000});
 
 // 监听任务执行前，要返回原来的参数(可修改执行参数)，返回null 终止任务执行
 queueInstance.hooks.taskBefore(function (res) {
@@ -127,3 +131,30 @@ for (let index = 0; index < 20; index++) {
 }
 
 ```
+## TaskQueue
+- constructor(options) 
+  - options.maxTask <null | number> 最大并发任务数,同时最多可执行5个任务
+  - options.interval <null | number> 并发任务数的时间间隔,比如有10个任务待执行，最大并发数是5，那么执行完5个任务后，等待interval 毫秒后重新执行下个一个并发任务数5 个任务
+
+### 实例属性: 钩子周期 hooks
+ - hooks.taskBefore(res):任务执行前的回调,要返回原来的参数(可修改执行参数)，返回null 终止任务执行
+  
+ - hooks.taskAfter(res):任务执行后回调,回调参数是原始函数执行后结果，要返回执行后的结果(可修改后的结果)
+  
+ - hooks.taskError(error):任务执行后失败回调，无论是原始函数执行后的错误，还是hooks.taskAfter 抛出的错误，都会被该回调捕获，无需返回值
+  
+ - hooks.taskSuccess(res):任务成功执行后的回调，回调参数是有可能是 hooks.taskAfter 的返回值，否则是原始函数执行后结果
+
+ - hooks.firstTaskAfter(res):队列里面第一个任务执行后回调
+ - 
+ - hooks.lastTaskAfter(res):队列里面最后一个任务执行后回调
+ - 
+ - hooks.taskIntercept():任务被拦截,终止执行后回调(hooks.taskBefore 返回null),没有执行原始函数
+  
+### 实例方法
+ - addTask(callback,...args): 将一个函数包装成经过队列控制的函数,callback 是原始函数，args 是callback 本身的参数,返回的是一个函数
+ - stopTask():停止待执行的任务
+ - startTask():开始执行待执行的任务
+ - getTaskQueueCount():获取当前待执行任务的个数 
+ - getRunTaskCount() : 获取当前正在执行的任务个数
+ - limt([],callback): 与addTask 不同,第一个参数是数组，数组每个参数将作为第二callback 回调的参数,回调函数成为队列里面的每个任务

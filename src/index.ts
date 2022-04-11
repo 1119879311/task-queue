@@ -74,18 +74,23 @@ class TaskQueue {
    * @returns
    */
   public addTask<T = any>(caller: Function, ...args: Array<T>) {
+    this.pushTask(caller, true, ...args);
+  }
+  /**
+   *
+   */
+  private pushTask<T = any>(
+    caller: Function,
+    isRunTask: boolean = true,
+    ...args: Array<T>
+  ) {
     if (typeof caller !== "function") {
       throw new Error("caller type mush Function");
     }
     return new Promise((resolve, reject) => {
       let task = this.createTask(caller, resolve, reject, args);
       this.queue.push(task);
-      this.actionTask();
-      // if (this.config.maxTask !== null && this.count >= this.config.maxTask) {
-      //   this.queue.push(task);
-      // } else {
-      //   task();
-      // }
+      isRunTask && this.actionTask();
     });
   }
   /**
@@ -131,19 +136,29 @@ class TaskQueue {
       let isTaskType: boolean;
       try {
         //开始正式执行任务
-        resultTaskBefore = Array.isArray(resultTaskBefore)
-          ? resultTaskBefore
-          : [resultTaskBefore];
-
+        if (resultTaskBefore !== undefined) {
+          resultTaskBefore = Array.isArray(resultTaskBefore)
+            ? resultTaskBefore
+            : [resultTaskBefore];
+        } else {
+          resultTaskBefore = args;
+        }
+        //这里是缺点,把原始函数当成异步执行了，产生了副作用
         resultTask = await caller(...resultTaskBefore);
+        // if (isPromise(resultTask)) {
+        //   resultTask = await resultTask;
+        // }
         isTaskType = true;
       } catch (error) {
         resultTask = error;
         isTaskType = false;
       } finally {
-        this.count--;
         // 执行后的
+        // taskAfter 这个有可能是同步或者异步
+        // 异步的话有可能是resolve 或者 reject，
+        // 三种情况，如果用awiat 必须的用trycatch 才能捕获reject
         let result = this.handleHooksCallBack("taskAfter", resultTask);
+
         this.handleTaskCallBack((data: any, isType: boolean) => {
           let isResult = isTaskType && isType;
           let taskCbType: IhookEMUN = isResult ? "taskSuccess" : "taskError";
@@ -157,15 +172,15 @@ class TaskQueue {
           this.handleHooksCallBack(taskCbType, data);
 
           //处理任务
-          if (this.count === 0 && this.queue.length === 0) {
+          if (this.count === 1 && this.queue.length === 0) {
             this.isFirstTask = true;
             this.handleHooksCallBack("lastTaskAfter", data);
           }
           taskCb(data);
+          this.count--;
           this.actionTask();
         }, result);
       }
-      return await true;
     };
   }
 
@@ -187,30 +202,6 @@ class TaskQueue {
     } else {
       cb(data, true);
     }
-  }
-
-  /**
-   * 队列任务处理
-   * @param {*} result
-   */
-  private handleTask(result: any, isBlock?: boolean) {
-    this.count--;
-    //是否为第一个任务
-    if (this.isFirstTask) {
-      this.isFirstTask = false;
-      !isBlock && this.handleHooksCallBack("firstTaskAfter", result);
-    }
-
-    //判断是否是最后一个任务,需要判断当前正在执行的任务个数,this.queue.length 有可能为0
-    if (this.count === 0 && this.queue.length === 0) {
-      this.isFirstTask = true;
-      !isBlock && this.handleHooksCallBack("lastTaskAfter", result);
-      // this.callbacks = {};
-    }
-    // 任务被拦截后回调
-    // isBlock && this.handleHooksCallBack("taskIntercept", result);
-
-    this.actionTask();
   }
 
   /**
@@ -278,9 +269,11 @@ class TaskQueue {
   }
 
   awitTimerRun(timer?: number) {
+    let timeout: number | undefined;
     return new Promise((resolve) => {
-      setTimeout(() => {
+      timeout = setTimeout(() => {
         resolve(true);
+        clearTimeout(timeout);
       }, timer);
     });
   }
@@ -294,7 +287,7 @@ class TaskQueue {
   /**
    * 重新执行任务
    */
-  runTask() {
+  startTask() {
     this.isRuning = true;
     this.actionTask();
   }
@@ -321,8 +314,9 @@ class TaskQueue {
   limit<T>(data: T[], cb: Function) {
     if (Array.isArray(data) && data.length) {
       data.forEach((itme) => {
-        this.addTask(cb, itme);
+        this.pushTask(cb, false, itme);
       });
+      this.actionTask();
     }
   }
 }

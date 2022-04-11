@@ -65,18 +65,19 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
          * @returns
          */
         addTask(caller, ...args) {
+            this.pushTask(caller, true, ...args);
+        }
+        /**
+         *
+         */
+        pushTask(caller, isRunTask = true, ...args) {
             if (typeof caller !== "function") {
                 throw new Error("caller type mush Function");
             }
             return new Promise((resolve, reject) => {
                 let task = this.createTask(caller, resolve, reject, args);
                 this.queue.push(task);
-                this.actionTask();
-                // if (this.config.maxTask !== null && this.count >= this.config.maxTask) {
-                //   this.queue.push(task);
-                // } else {
-                //   task();
-                // }
+                isRunTask && this.actionTask();
             });
         }
         /**
@@ -116,10 +117,19 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 let isTaskType;
                 try {
                     //开始正式执行任务
-                    resultTaskBefore = Array.isArray(resultTaskBefore)
-                        ? resultTaskBefore
-                        : [resultTaskBefore];
+                    if (resultTaskBefore !== undefined) {
+                        resultTaskBefore = Array.isArray(resultTaskBefore)
+                            ? resultTaskBefore
+                            : [resultTaskBefore];
+                    }
+                    else {
+                        resultTaskBefore = args;
+                    }
+                    //这里是缺点,把原始函数当成异步执行了，产生了副作用
                     resultTask = yield caller(...resultTaskBefore);
+                    // if (isPromise(resultTask)) {
+                    //   resultTask = await resultTask;
+                    // }
                     isTaskType = true;
                 }
                 catch (error) {
@@ -127,8 +137,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     isTaskType = false;
                 }
                 finally {
-                    this.count--;
                     // 执行后的
+                    // taskAfter 这个有可能是同步或者异步
+                    // 异步的话有可能是resolve 或者 reject，
+                    // 三种情况，如果用awiat 必须的用trycatch 才能捕获reject
                     let result = this.handleHooksCallBack("taskAfter", resultTask);
                     this.handleTaskCallBack((data, isType) => {
                         let isResult = isTaskType && isType;
@@ -141,15 +153,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                         // 成功或者失败回调
                         this.handleHooksCallBack(taskCbType, data);
                         //处理任务
-                        if (this.count === 0 && this.queue.length === 0) {
+                        if (this.count === 1 && this.queue.length === 0) {
                             this.isFirstTask = true;
                             this.handleHooksCallBack("lastTaskAfter", data);
                         }
                         taskCb(data);
+                        this.count--;
                         this.actionTask();
                     }, result);
                 }
-                return yield true;
             });
         }
         /**
@@ -171,27 +183,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             else {
                 cb(data, true);
             }
-        }
-        /**
-         * 队列任务处理
-         * @param {*} result
-         */
-        handleTask(result, isBlock) {
-            this.count--;
-            //是否为第一个任务
-            if (this.isFirstTask) {
-                this.isFirstTask = false;
-                !isBlock && this.handleHooksCallBack("firstTaskAfter", result);
-            }
-            //判断是否是最后一个任务,需要判断当前正在执行的任务个数,this.queue.length 有可能为0
-            if (this.count === 0 && this.queue.length === 0) {
-                this.isFirstTask = true;
-                !isBlock && this.handleHooksCallBack("lastTaskAfter", result);
-                // this.callbacks = {};
-            }
-            // 任务被拦截后回调
-            // isBlock && this.handleHooksCallBack("taskIntercept", result);
-            this.actionTask();
         }
         /**
          *  处理钩子回调
@@ -254,9 +245,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
         }
         awitTimerRun(timer) {
+            let timeout;
             return new Promise((resolve) => {
-                setTimeout(() => {
+                timeout = setTimeout(() => {
                     resolve(true);
+                    clearTimeout(timeout);
                 }, timer);
             });
         }
@@ -269,7 +262,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         /**
          * 重新执行任务
          */
-        runTask() {
+        startTask() {
             this.isRuning = true;
             this.actionTask();
         }
@@ -294,8 +287,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         limit(data, cb) {
             if (Array.isArray(data) && data.length) {
                 data.forEach((itme) => {
-                    this.addTask(cb, itme);
+                    this.pushTask(cb, false, itme);
                 });
+                this.actionTask();
             }
         }
     }

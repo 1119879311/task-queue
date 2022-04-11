@@ -18,7 +18,11 @@ declare class TaskQueue {
      * @param args
      * @returns
      */
-    addTask<T = any>(caller: Function, ...args: Array<T>): Promise<unknown>;
+    addTask<T = any>(caller: Function, ...args: Array<T>): void;
+    /**
+     *
+     */
+    private pushTask;
     /**
      *
      * @param caller
@@ -35,11 +39,6 @@ declare class TaskQueue {
      * @param data 数据
      */
     private handleTaskCallBack;
-    /**
-     * 队列任务处理
-     * @param {*} result
-     */
-    private handleTask;
     /**
      *  处理钩子回调
      * @param {*} callName
@@ -60,7 +59,7 @@ declare class TaskQueue {
     /**
      * 重新执行任务
      */
-    runTask(): void;
+    startTask(): void;
     /**
      * 获取当前正在执行的队列个数
      * @returns
