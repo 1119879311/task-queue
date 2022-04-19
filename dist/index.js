@@ -27,6 +27,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         constructor(option) {
             this.count = 0;
             this.queue = [];
+            this.runEndCount = 0;
             this.isFirstTask = true;
             this.callbacks = {};
             this.isRuning = true;
@@ -34,6 +35,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 maxTask: 8,
                 interval: null,
             }, option);
+            // if (this.config.interval !== null && this.config.maxTask === null) {
+            //   this.config.maxTask = 1;
+            // }
             this.hooks = {
                 taskBefore: (cb) => {
                     this.callbacks.taskBefore = () => cb;
@@ -59,13 +63,41 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             };
         }
         /**
+         * 是否开始执行下个任务
+         * @returns
+         */
+        isStartRun(run = false) {
+            //判断是否能执行下一个任务
+            //maxTask,interval
+            //分情况
+            let { maxTask, interval } = this.config;
+            let result = run;
+            // //当存在最大并发数间隔
+            if (interval !== null) {
+                let max = maxTask || 1;
+                if (this.runEndCount === max && this.count === max) {
+                    this.count = 0;
+                    this.runEndCount = 0;
+                    result = true;
+                }
+                else {
+                    result = false;
+                }
+            }
+            else {
+                this.count--;
+                this.runEndCount = 0;
+            }
+            return result;
+        }
+        /**
          *
          * @param caller
          * @param args
          * @returns
          */
         addTask(caller, ...args) {
-            this.pushTask(caller, true, ...args);
+            return this.pushTask(caller, true, ...args);
         }
         /**
          *
@@ -75,7 +107,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 throw new Error("caller type mush Function");
             }
             return new Promise((resolve, reject) => {
-                let task = this.createTask(caller, resolve, reject, args);
+                let task = this.createTask(caller, resolve, reject, isRunTask, args);
                 this.queue.push(task);
                 isRunTask && this.actionTask();
             });
@@ -88,7 +120,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
          * @param args
          * @returns
          */
-        createTask(caller, resolve, reject, args) {
+        createTask(caller, resolve, reject, isRunTask, args) {
             //创建一个任务，函数
             return () => __awaiter(this, void 0, void 0, function* () {
                 this.count++;
@@ -107,7 +139,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 }
                 // 中断任务执行
                 if (isBeforeError) {
-                    // this.handleTask(args, true);
                     this.handleHooksCallBack("taskIntercept", args);
                     reject({ type: "Intercept", data: null, options: args });
                     this.count--;
@@ -126,10 +157,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                         resultTaskBefore = args;
                     }
                     //这里是缺点,把原始函数当成异步执行了，产生了副作用
-                    resultTask = yield caller(...resultTaskBefore);
-                    // if (isPromise(resultTask)) {
-                    //   resultTask = await resultTask;
-                    // }
+                    resultTask = caller(...resultTaskBefore);
+                    if (isPromise(resultTask) || isRunTask) {
+                        resultTask = yield resultTask;
+                    }
                     isTaskType = true;
                 }
                 catch (error) {
@@ -153,12 +184,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                         // 成功或者失败回调
                         this.handleHooksCallBack(taskCbType, data);
                         //处理任务
-                        if (this.count === 1 && this.queue.length === 0) {
+                        taskCb(data);
+                        this.runEndCount++;
+                        this.isStartRun();
+                        if (this.count === 0 &&
+                            this.runEndCount === 0 &&
+                            this.queue.length === 0) {
                             this.isFirstTask = true;
                             this.handleHooksCallBack("lastTaskAfter", data);
                         }
-                        taskCb(data);
-                        this.count--;
                         this.actionTask();
                     }, result);
                 }
@@ -216,9 +250,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 if (this.queue.length <= 0 || !this.isRuning) {
                     return;
                 }
-                //情况：存在并发最大个数
+                //存在并发最大个数
                 let waitTaskArr = [];
-                if (maxTask !== null) {
+                if (interval !== null || maxTask !== null) {
+                    maxTask = maxTask || 1;
                     let runIndex = maxTask - this.count;
                     if (runIndex > 0) {
                         waitTaskArr = this.queue.splice(0, runIndex);

@@ -25,6 +25,8 @@ class TaskQueue {
 
   private queue: Array<Function> = [];
 
+  private runEndCount: number = 0;
+
   private isFirstTask: boolean = true;
 
   private callbacks: Partial<Record<IhookEMUN, () => Function>> = {};
@@ -42,6 +44,9 @@ class TaskQueue {
       },
       option
     );
+    // if (this.config.interval !== null && this.config.maxTask === null) {
+    //   this.config.maxTask = 1;
+    // }
     this.hooks = {
       taskBefore: (cb) => {
         this.callbacks.taskBefore = () => cb;
@@ -68,13 +73,41 @@ class TaskQueue {
   }
 
   /**
+   * 是否开始执行下个任务
+   * @returns
+   */
+  private isStartRun(run: boolean = false) {
+    //判断是否能执行下一个任务
+    //maxTask,interval
+    //分情况
+    let { maxTask, interval } = this.config;
+
+    let result = run;
+
+    // //当存在最大并发数间隔
+    if (interval !== null) {
+      let max = maxTask || 1;
+      if (this.runEndCount === max && this.count === max) {
+        this.count = 0;
+        this.runEndCount = 0;
+        result = true;
+      } else {
+        result = false;
+      }
+    } else {
+      this.count--;
+      this.runEndCount = 0;
+    }
+    return result;
+  }
+  /**
    *
    * @param caller
    * @param args
    * @returns
    */
   public addTask<T = any>(caller: Function, ...args: Array<T>) {
-    this.pushTask(caller, true, ...args);
+    return this.pushTask(caller, true, ...args);
   }
   /**
    *
@@ -88,7 +121,7 @@ class TaskQueue {
       throw new Error("caller type mush Function");
     }
     return new Promise((resolve, reject) => {
-      let task = this.createTask(caller, resolve, reject, args);
+      let task = this.createTask(caller, resolve, reject, isRunTask, args);
       this.queue.push(task);
       isRunTask && this.actionTask();
     });
@@ -105,6 +138,7 @@ class TaskQueue {
     caller: Function,
     resolve: (value: unknown) => void,
     reject: (reason?: any) => void,
+    isRunTask: boolean,
     args: T[]
   ) {
     //创建一个任务，函数
@@ -125,7 +159,6 @@ class TaskQueue {
       }
       // 中断任务执行
       if (isBeforeError) {
-        // this.handleTask(args, true);
         this.handleHooksCallBack("taskIntercept", args);
         reject({ type: "Intercept", data: null, options: args });
         this.count--;
@@ -144,10 +177,10 @@ class TaskQueue {
           resultTaskBefore = args;
         }
         //这里是缺点,把原始函数当成异步执行了，产生了副作用
-        resultTask = await caller(...resultTaskBefore);
-        // if (isPromise(resultTask)) {
-        //   resultTask = await resultTask;
-        // }
+        resultTask = caller(...resultTaskBefore);
+        if (isPromise(resultTask) || isRunTask) {
+          resultTask = await resultTask;
+        }
         isTaskType = true;
       } catch (error) {
         resultTask = error;
@@ -172,12 +205,18 @@ class TaskQueue {
           this.handleHooksCallBack(taskCbType, data);
 
           //处理任务
-          if (this.count === 1 && this.queue.length === 0) {
+
+          taskCb(data);
+          this.runEndCount++;
+          this.isStartRun();
+          if (
+            this.count === 0 &&
+            this.runEndCount === 0 &&
+            this.queue.length === 0
+          ) {
             this.isFirstTask = true;
             this.handleHooksCallBack("lastTaskAfter", data);
           }
-          taskCb(data);
-          this.count--;
           this.actionTask();
         }, result);
       }
@@ -241,15 +280,17 @@ class TaskQueue {
       if (this.queue.length <= 0 || !this.isRuning) {
         return;
       }
-      //情况：存在并发最大个数
+      //存在并发最大个数
       let waitTaskArr: Function[] = [];
-      if (maxTask !== null) {
+      if (interval !== null || maxTask !== null) {
+        maxTask = maxTask || 1;
         let runIndex = maxTask - this.count;
         if (runIndex > 0) {
           waitTaskArr = this.queue.splice(0, runIndex);
         }
       } else {
         // 没有限制
+
         waitTaskArr = this.queue.splice(0);
       }
       waitTaskArr.forEach((task) => {
@@ -260,6 +301,7 @@ class TaskQueue {
       if (this.count === 0) {
         this.awitTimerRun(interval).then(() => {
           //可能等的过程中 队列被中断了
+
           run();
         });
       }

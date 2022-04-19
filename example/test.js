@@ -1,5 +1,7 @@
 const TaskQueue = require("../dist/index").default;
-let queueInstance = new TaskQueue({ maxTask: null, interval: null });
+// let option = { maxTask: 2, interval: 5000 };
+let option = { maxTask: null };
+let queueInstance = new TaskQueue(option);
 
 // 监听任务执行前，要返回原来的参数(可修改执行参数)，返回null 终止任务执行
 queueInstance.hooks.taskBefore(function (res) {
@@ -63,11 +65,13 @@ queueInstance.hooks.taskIntercept(function (res) {
   console.log("任务被终止执行：taskIntercept", res);
 });
 // 监听最后一个任务执行完毕
+let lastIndex = 0;
 queueInstance.hooks.lastTaskAfter(function (res) {
+  lastIndex++;
   console.log("成功执行：", successcoutTask);
   console.log("失败执行：", errcoutTask);
   console.log("没有执行(被拦截)：", InterceptTask);
-  console.log("最后一个任务执行完毕：lastTaskAfter", res);
+  console.log("--最后一个任务执行完毕：lastTaskAfter---" + lastIndex, res);
 });
 
 // 创建 [max,min] 范围的随机数
@@ -79,6 +83,7 @@ function createRond(max, min) {
 
 // 要调用的目标方法
 function asyncAdd(options) {
+  // return options.a + options.b;
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       // resolve(a + b[0] + b[1]);
@@ -107,38 +112,23 @@ for (let index = 0; index < 8; index++) {
   //     console.log("err", err);
   //   });
   // 使用队列，控制并发执行个数
-  // queueAsyncAdd({ a: index, b: 10 })
-  //   .then((res) => {
-  //     console.log("执行 完第" + index + "个任务:", "成功结果为：", res);
-  //   })
-  //   .catch((err) => {
-  //     console.log("执行 完第" + index + "个任务:", "失败结果为：", err);
-  //   });
+  queueAsyncAdd({ a: index, b: 10 })
+    .then((res) => {
+      console.log("执行 完第" + index + "个任务:", "成功结果为：", res);
+    })
+    .catch((err) => {
+      console.log("执行 完第" + index + "个任务:", "失败结果为：", err);
+    });
 }
 
-let arr = Array.from(new Array(8), (_, v) => v + 1);
-queueInstance.limit(arr, (data) => {
-  console.log("limt--------", data);
-  return data;
-});
+// let arr = Array.from(new Array(8), (_, v) => v + 1);
+// queueInstance.limit(arr, (data) => {
+//   console.log("limt--------", data);
+//   return data;
+// });
 
 function isPromse(data) {
   return data && typeof data.then == "function";
-}
-
-async function A() {
-  return 1212;
-}
-
-function C() {
-  return 789;
-}
-async function B(Fn) {
-  let result = Fn();
-  if (isPromse(result)) {
-    result = await result;
-  }
-  console.log("result", result);
 }
 
 // B(A);

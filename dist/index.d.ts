@@ -7,18 +7,24 @@ declare class TaskQueue {
     private config;
     private count;
     private queue;
+    private runEndCount;
     private isFirstTask;
     private callbacks;
     private isRuning?;
     hooks: Record<IhookEMUN, (cb: Function) => void>;
     constructor(option: IOption);
     /**
+     * 是否开始执行下个任务
+     * @returns
+     */
+    private isStartRun;
+    /**
      *
      * @param caller
      * @param args
      * @returns
      */
-    addTask<T = any>(caller: Function, ...args: Array<T>): void;
+    addTask<T = any>(caller: Function, ...args: Array<T>): Promise<unknown>;
     /**
      *
      */
